@@ -125,6 +125,12 @@ classdef VrepInterface < handle
                 element = obj.element_from_string(handle);
                 if(~element.state_from_function_signature('get_object_translation'))
                     [~,object_position]  = obj.vrep.simxGetObjectPosition(obj.clientID,obj.handle_from_string_or_handle(handle),-1,obj.OP_STREAMING);
+                    % We need to check the buffer until it is not empty,
+                    % TODO add a timeout.
+                    retval = 1;
+                    while retval==1
+                        [retval,object_position] = obj.vrep.simxGetObjectPosition(obj.clientID,obj.handle_from_string_or_handle(handle),-1,obj.OP_BUFFER);
+                    end
                 else
                     [~,object_position]  = obj.vrep.simxGetObjectPosition(obj.clientID,obj.handle_from_string_or_handle(handle),-1,obj.OP_BUFFER);
                 end
@@ -151,8 +157,14 @@ classdef VrepInterface < handle
             % as specified by the remote API documentation
             if nargin <= 2
                 element = obj.element_from_string(handle);
-                if(~element.state_from_function_signature('get_object_translation'))
+                if(~element.state_from_function_signature('get_object_rotation'))
                     [~,object_rotation] = obj.vrep.simxGetObjectQuaternion(obj.clientID,obj.handle_from_string_or_handle(handle),-1,obj.OP_STREAMING);
+                    % We need to check the buffer until it is not empty,
+                    % TODO add a timeout.
+                    retval = 1;
+                    while retval==1
+                        [retval,object_rotation] = obj.vrep.simxGetObjectQuaternion(obj.clientID,obj.handle_from_string_or_handle(handle),-1,obj.OP_BUFFER);
+                    end
                 else
                     [~,object_rotation] = obj.vrep.simxGetObjectQuaternion(obj.clientID,obj.handle_from_string_or_handle(handle),-1,obj.OP_BUFFER);
                 end
@@ -185,13 +197,15 @@ classdef VrepInterface < handle
         end
         
         %% Set Object Pose
-        function set_object_pose(obj,handle,relative_to_handle,x,opmode)
-            t = translation(x);
-            r = rotation(x);
-            if nargin == 2
+        function set_object_pose(obj,handle,x,relative_to_handle,opmode)
+            if nargin == 3
+                t = translation(x);
+                r = rotation(x);
                 obj.set_object_translation(obj.handle_from_string_or_handle(handle),-1,t,obj.OP_ONESHOT);
                 obj.set_object_rotation(obj.handle_from_string_or_handle(handle),-1,r,obj.OP_ONESHOT);
             else
+                t = translation(x);
+                r = rotation(x);
                 obj.set_object_translation(obj.handle_from_string_or_handle(handle),obj.handle_from_string_or_handle(relative_to_handle),t,opmode);
                 obj.set_object_rotation(obj.handle_from_string_or_handle(handle),obj.handle_from_string_or_handle(relative_to_handle),r,opmode);
             end
@@ -201,11 +215,11 @@ classdef VrepInterface < handle
         function set_joint_positions(obj,handles,thetas,opmode)
             if nargin == 3
                 for joint_index=1:length(handles)
-                    obj.vrep.simxSetJointPosition(obj.clientID,handles(joint_index),thetas(joint_index),obj.OP_ONESHOT);
+                    obj.vrep.simxSetJointPosition(obj.clientID,obj.handle_from_string_or_handle(handles{joint_index}),thetas(joint_index),obj.OP_ONESHOT);
                 end
             else
                 for joint_index=1:length(handles)
-                    obj.vrep.simxSetJointPosition(obj.clientID,handles(joint_index),thetas(joint_index),opmode);
+                    obj.vrep.simxSetJointPosition(obj.clientID,obj.handle_from_string_or_handle(handles{joint_index}),thetas(joint_index),opmode);
                 end
             end
         end
@@ -215,13 +229,13 @@ classdef VrepInterface < handle
             if nargin == 3
                 obj.vrep.simxPauseCommunication(obj.clientID,1)
                 for joint_index=1:length(handles)
-                    obj.vrep.simxSetJointTargetPosition(obj.clientID,handles(joint_index),thetas(joint_index),obj.OP_ONESHOT);
+                    obj.vrep.simxSetJointTargetPosition(obj.clientID,obj.handle_from_string_or_handle(handles{joint_index}),thetas(joint_index),obj.OP_ONESHOT);
                 end
                 obj.vrep.simxPauseCommunication(obj.clientID,0)
             else
                 obj.vrep.simxPauseCommunication(obj.clientID,1)
                 for joint_index=1:length(handles)
-                    obj.vrep.simxSetJointTargetPosition(obj.clientID,handles(joint_index),thetas(joint_index),opmode);
+                    obj.vrep.simxSetJointTargetPosition(obj.clientID,obj.handle_from_string_or_handle(handles{joint_index}),thetas(joint_index),opmode);
                 end
                 obj.vrep.simxPauseCommunication(obj.clientID,0)
             end
@@ -238,7 +252,11 @@ classdef VrepInterface < handle
                 if nargin <= 2
                     element = obj.element_from_string(handles{joint_index});
                     if(~element.state_from_function_signature('get_joint_positions'))
-                        [retval,tmp] = obj.vrep.simxGetJointPosition(obj.clientID,element.handle,obj.OP_STREAMING);
+                        [~,tmp] = obj.vrep.simxGetJointPosition(obj.clientID,element.handle,obj.OP_STREAMING);
+                        retval=1;
+                        while retval==1
+                            [retval,tmp] = obj.vrep.simxGetJointPosition(obj.clientID,element.handle,obj.OP_BUFFER);
+                        end
                     else
                         [retval,tmp] = obj.vrep.simxGetJointPosition(obj.clientID,element.handle,obj.OP_BUFFER);
                     end
