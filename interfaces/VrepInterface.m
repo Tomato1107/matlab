@@ -141,8 +141,8 @@ classdef VrepInterface < handle
         end
         
         %% Set Object Translation
-        function set_object_translation(obj,handle,relative_to_handle,t,opmode)
-            if nargin == 2
+        function set_object_translation(obj,handle,t,relative_to_handle,opmode)
+            if nargin == 3
                 obj.vrep.simxSetObjectPosition(obj.clientID,obj.handle_from_string_or_handle(handle),-1,t.q(2:4),obj.OP_ONESHOT);
             else
                 obj.vrep.simxSetObjectPosition(obj.clientID,obj.handle_from_string_or_handle(handle),obj.handle_from_string_or_handle(relative_to_handle),t.q(2:4),opmode);
@@ -176,8 +176,8 @@ classdef VrepInterface < handle
         end
         
         %% Set Object Rotation
-        function set_object_rotation(obj,handle,relative_to_handle,r,opmode)
-            if nargin == 2
+        function set_object_rotation(obj,handle,r,relative_to_handle,opmode)
+            if nargin == 3
                 obj.vrep.simxSetObjectQuaternion(obj.clientID,obj.handle_from_string_or_handle(handle),-1,[r.q(2:4); r.q(1)],obj.OP_ONESHOT); %V-Rep's quaternion representation is [x y z w] so we have to take that into account
             else
                 obj.vrep.simxSetObjectQuaternion(obj.clientID,obj.handle_from_string_or_handle(handle),obj.handle_from_string_or_handle(relative_to_handle),[r.q(2:4); r.q(1)],opmode); %V-Rep's quaternion representation is [x y z w] so we have to take that into account
@@ -201,8 +201,8 @@ classdef VrepInterface < handle
             if nargin == 3
                 t = translation(x);
                 r = rotation(x);
-                obj.set_object_translation(obj.handle_from_string_or_handle(handle),-1,t,obj.OP_ONESHOT);
-                obj.set_object_rotation(obj.handle_from_string_or_handle(handle),-1,r,obj.OP_ONESHOT);
+                obj.set_object_translation(obj.handle_from_string_or_handle(handle),t,-1,obj.OP_ONESHOT);
+                obj.set_object_rotation(obj.handle_from_string_or_handle(handle),r,-1,obj.OP_ONESHOT);
             else
                 t = translation(x);
                 r = rotation(x);
@@ -229,7 +229,12 @@ classdef VrepInterface < handle
             if nargin == 3
                 obj.vrep.simxPauseCommunication(obj.clientID,1)
                 for joint_index=1:length(handles)
-                    obj.vrep.simxSetJointTargetPosition(obj.clientID,obj.handle_from_string_or_handle(handles{joint_index}),thetas(joint_index),obj.OP_ONESHOT);
+                    if isa(handles,'cell')
+                        obj.vrep.simxSetJointTargetPosition(obj.clientID,obj.handle_from_string_or_handle(handles{joint_index}),thetas(joint_index),obj.OP_ONESHOT);
+                    else
+                        obj.vrep.simxSetJointTargetPosition(obj.clientID,obj.handle_from_string_or_handle(handles),thetas(joint_index),obj.OP_ONESHOT);
+                    end
+                    
                 end
                 obj.vrep.simxPauseCommunication(obj.clientID,0)
             else
@@ -250,7 +255,11 @@ classdef VrepInterface < handle
                 % opmode, it is chosen first as STREAMING and then as BUFFER,
                 % as specified by the remote API documentation
                 if nargin <= 2
-                    element = obj.element_from_string(handles{joint_index});
+                    if isa(handles,'cell')
+                        element = obj.element_from_string(handles{joint_index});
+                    else
+                        element = obj.element_from_string(handles);
+                    end
                     if(~element.state_from_function_signature('get_joint_positions'))
                         [~,tmp] = obj.vrep.simxGetJointPosition(obj.clientID,element.handle,obj.OP_STREAMING);
                         retval=1;
